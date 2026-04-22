@@ -34,10 +34,87 @@ def ingest_documents():
     return len(docs), len(chunks)
 
 
-st.set_page_config(page_title="Asystent firmowy RAG", layout="wide")
+st.set_page_config(
+    page_title="Asystent firmowy RAG",
+    page_icon="📘",
+    layout="wide",
+)
 
-st.title("Asystent firmowy RAG")
-st.write("Wgraj dokumenty, zbuduj indeks i zadawaj pytania na podstawie firmowej wiedzy.")
+st.markdown(
+    """
+    <style>
+        .block-container {
+            max-width: 1000px;
+            padding-top: 2rem;
+            padding-bottom: 2rem;
+        }
+
+        .main-title {
+            font-size: 2.2rem;
+            font-weight: 700;
+            margin-bottom: 0.3rem;
+        }
+
+        .subtitle {
+            color: #94a3b8;
+            font-size: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .answer-box {
+            background: rgba(30, 41, 59, 0.55);
+            border: 1px solid rgba(59, 130, 246, 0.25);
+            border-left: 4px solid #3b82f6;
+            border-radius: 12px;
+            padding: 1rem 1.2rem;
+            margin-top: 0.75rem;
+            line-height: 1.7;
+            color: #f8fafc;
+        }
+
+        .source-box {
+            background: rgba(15, 23, 42, 0.45);
+            border: 1px solid rgba(148, 163, 184, 0.18);
+            border-radius: 12px;
+            padding: 0.9rem 1rem;
+            margin-bottom: 0.8rem;
+        }
+
+        .source-title {
+            font-weight: 600;
+            margin-bottom: 0.4rem;
+            color: #e2e8f0;
+        }
+
+        .source-text {
+            color: #cbd5e1;
+            font-size: 0.95rem;
+            line-height: 1.6;
+        }
+
+        .stButton > button {
+            border-radius: 10px;
+            padding: 0.55rem 1rem;
+            font-weight: 600;
+        }
+
+        .stTextInput > div > div > input {
+            border-radius: 10px;
+        }
+
+        .stFileUploader {
+            padding-top: 0.3rem;
+        }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+st.markdown('<div class="main-title">📘 Asystent firmowy RAG</div>', unsafe_allow_html=True)
+st.markdown(
+    '<div class="subtitle">Wgraj dokumenty, zbuduj indeks i zadawaj pytania na podstawie firmowej wiedzy.</div>',
+    unsafe_allow_html=True,
+)
 
 tab1, tab2 = st.tabs(["Indeksowanie dokumentów", "Pytania do dokumentów"])
 
@@ -66,7 +143,10 @@ with tab1:
 
 with tab2:
     st.subheader("Zadaj pytanie")
-    question = st.text_input("Wpisz pytanie dotyczące dokumentów")
+    question = st.text_input(
+        "Wpisz pytanie dotyczące dokumentów",
+        placeholder="Np. Jakie usługi oferuje firma?"
+    )
 
     if st.button("Zapytaj"):
         if not question.strip():
@@ -76,10 +156,19 @@ with tab2:
                 result = ask_rag(question)
 
             st.markdown("### Odpowiedź")
-            st.write(result["answer"])
+            st.markdown(
+                f"<div class='answer-box'>{result['answer']}</div>",
+                unsafe_allow_html=True,
+            )
 
-            with st.expander("Pokaż źródła"):
-                for i, doc in enumerate(result["sources"], start=1):
-                    st.markdown(f"**Źródło {i}:** {doc.metadata.get('source', 'unknown')}")
-                    st.write(doc.page_content[:1000])
-                    st.markdown("---")
+            st.markdown("### Źródła")
+            for i, doc in enumerate(result["sources"], start=1):
+                st.markdown(
+                    f"""
+                    <div class="source-box">
+                        <div class="source-title">Źródło {i}: {doc.metadata.get('source', 'unknown')}</div>
+                        <div class="source-text">{doc.page_content[:1000]}</div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
