@@ -1,4 +1,5 @@
 from pathlib import Path
+import html
 
 import streamlit as st
 from dotenv import load_dotenv
@@ -16,21 +17,27 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 def save_uploaded_files(uploaded_files):
     saved_files = []
+
     for uploaded_file in uploaded_files:
         file_path = DATA_DIR / uploaded_file.name
+
         with open(file_path, "wb") as f:
             f.write(uploaded_file.getbuffer())
+
         saved_files.append(file_path.name)
+
     return saved_files
 
 
 def ingest_documents():
     docs = load_text_documents(str(DATA_DIR))
+
     if not docs:
         return 0, 0
 
     chunks = split_documents(docs)
     build_vector_store(chunks)
+
     return len(docs), len(chunks)
 
 
@@ -61,17 +68,6 @@ st.markdown(
             margin-bottom: 1.5rem;
         }
 
-        .answer-box {
-            background: rgba(30, 41, 59, 0.55);
-            border: 1px solid rgba(59, 130, 246, 0.25);
-            border-left: 4px solid #3b82f6;
-            border-radius: 12px;
-            padding: 1rem 1.2rem;
-            margin-top: 0.75rem;
-            line-height: 1.7;
-            color: #f8fafc;
-        }
-
         .source-box {
             background: rgba(15, 23, 42, 0.45);
             border: 1px solid rgba(148, 163, 184, 0.18);
@@ -90,16 +86,13 @@ st.markdown(
             color: #cbd5e1;
             font-size: 0.95rem;
             line-height: 1.6;
+            white-space: pre-wrap;
         }
 
         .stButton > button {
             border-radius: 10px;
             padding: 0.55rem 1rem;
             font-weight: 600;
-        }
-
-        .stTextInput > div > div > input {
-            border-radius: 10px;
         }
 
         .stFileUploader {
@@ -110,65 +103,109 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-st.markdown('<div class="main-title">📘 Asystent firmowy RAG</div>', unsafe_allow_html=True)
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+if "last_sources" not in st.session_state:
+    st.session_state.last_sources = []
+
 st.markdown(
-    '<div class="subtitle">Wgraj dokumenty, zbuduj indeks i zadawaj pytania na podstawie firmowej wiedzy.</div>',
+    '<div class="main-title">📘 Asystent firmowy RAG</div>',
     unsafe_allow_html=True,
 )
 
-tab1, tab2 = st.tabs(["Indeksowanie dokumentów", "Pytania do dokumentów"])
+st.markdown(
+    '<div class="subtitle">Wgraj dokumenty, zbuduj indeks i rozmawiaj z asystentem na podstawie firmowej wiedzy.</div>',
+    unsafe_allow_html=True,
+)
+
+tab1, tab2 = st.tabs(["Indeksowanie dokumentów", "Czat z dokumentami"])
 
 with tab1:
     st.subheader("Dodaj dokumenty")
+
     uploaded_files = st.file_uploader(
         "Wgraj pliki TXT",
         type=["txt"],
-        accept_multiple_files=True
+        accept_multiple_files=True,
     )
 
     if uploaded_files:
         saved_files = save_uploaded_files(uploaded_files)
         st.success(f"Zapisano pliki: {', '.join(saved_files)}")
 
-    if st.button("Zbuduj indeks"):
-        with st.spinner("Przetwarzanie dokumentów i budowanie bazy..."):
-            docs_count, chunks_count = ingest_documents()
+    col1, col2 = st.columns([1, 1])
 
-        if docs_count == 0:
-            st.warning("Brak dokumentów do przetworzenia.")
-        else:
-            st.success(
-                f"Gotowe. Wczytano {docs_count} dokumentów i utworzono {chunks_count} chunków."
-            )
+    with col1:
+        if st.button("Zbuduj indeks"):
+            with st.spinner("Przetwarzanie dokumentów i budowanie bazy..."):
+                docs_count, chunks_count = ingest_documents()
+
+            if docs_count == 0:
+                st.warning("Brak dokumentów do przetworzenia.")
+            else:
+                st.success(
+                    f"Gotowe. Wczytano {docs_count} dokumentów "
+                    f"i utworzono {chunks_count} chunków."
+                )
+
+    with col2:
+        if st.button("Wyczyść rozmowę"):
+            st.session_state.messages = []
+            st.session_state.last_sources = []
+            st.success("Rozmowa została wyczyszczona.")
 
 with tab2:
-    st.subheader("Zadaj pytanie")
-    question = st.text_input(
-        "Wpisz pytanie dotyczące dokumentów",
-        placeholder="Np. Jakie usługi oferuje firma?"
-    )
+    st.subheader("Czat")
 
-    if st.button("Zapytaj"):
-        if not question.strip():
-            st.warning("Wpisz pytanie.")
-        else:
-            with st.spinner("Szukam odpowiedzi..."):
-                result = ask_rag(question)
+    chat_container = st.container()
 
-            st.markdown("### Odpowiedź")
-            st.markdown(
-                f"<div class='answer-box'>{result['answer']}</div>",
-                unsafe_allow_html=True,
+    with chat_container:
+        for message in st.session_state.messages:
+            with st.chat_message(message["role"]):
+                st.markdown(message["content"])
+
+    user_question = st.chat_input("Zadaj pytanie dotyczące dokumentów...")
+
+    if user_question:
+        st.session_state.messages.append(
+            {
+                "role": "user",
+                "content": user_question,
+            }
+        )
+
+        with st.spinner("Szukam odpowiedzi w dokumentach..."):
+            result = ask_rag(
+                question=user_question,
+                chat_history=st.session_state.messages[-6:]
             )
 
-            st.markdown("### Źródła")
-            for i, doc in enumerate(result["sources"], start=1):
-                st.markdown(
-                    f"""
-                    <div class="source-box">
-                        <div class="source-title">Źródło {i}: {doc.metadata.get('source', 'unknown')}</div>
-                        <div class="source-text">{doc.page_content[:1000]}</div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
+        assistant_answer = result["answer"]
+
+        st.session_state.messages.append(
+            {
+                "role": "assistant",
+                "content": assistant_answer,
+            }
+        )
+
+        st.session_state.last_sources = result["sources"]
+        st.rerun()
+
+    if st.session_state.last_sources:
+        st.markdown("### Źródła ostatniej odpowiedzi")
+
+        for i, doc in enumerate(st.session_state.last_sources, start=1):
+            source_name = html.escape(doc.metadata.get("source", "unknown"))
+            source_text = html.escape(doc.page_content[:1000])
+
+            st.markdown(
+                f"""
+                <div class="source-box">
+                    <div class="source-title">Źródło {i}: {source_name}</div>
+                    <div class="source-text">{source_text}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
