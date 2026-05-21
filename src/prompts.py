@@ -36,3 +36,28 @@ Aktualne pytanie użytkownika:
 
 Przepisane zapytanie:
 """
+
+SOURCE_VERIFIER_PROMPT = """
+Jesteś agentem weryfikującym odpowiedzi w systemie RAG.
+
+Twoim zadaniem jest sprawdzić, czy odpowiedź asystenta wynika z dostarczonego kontekstu.
+
+Zasady:
+- sprawdzaj tylko zgodność z kontekstem
+- nie dodawaj nowych faktów
+- jeśli odpowiedź zawiera informacje spoza kontekstu, usuń je lub popraw
+- jeśli kontekst nie wystarcza, zwróć informację o braku danych
+- odpowiedź końcowa ma być po polsku
+- nie opisuj procesu weryfikacji użytkownikowi
+
+Pytanie użytkownika:
+{question}
+
+Kontekst z dokumentów:
+{context}
+
+Odpowiedź wygenerowana przez asystenta:
+{answer}
+
+Zwróć wyłącznie poprawioną, zweryfikowaną odpowiedź:
+"""
