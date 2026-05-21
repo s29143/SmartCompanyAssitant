@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 
 from src.loaders import load_text_documents
 from src.chunking import split_documents
+from src.questions import EXAMPLE_QUESTIONS
 from src.vector_store import build_vector_store
 from src.rag_chain import ask_rag
 
@@ -98,6 +99,38 @@ st.markdown(
         .stFileUploader {
             padding-top: 0.3rem;
         }
+        
+        .examples-wrapper {
+            margin: 1rem 0 0.75rem 0;
+        }
+        
+        .examples-title {
+            font-size: 1.05rem;
+            font-weight: 600;
+            color: #e2e8f0;
+            margin-bottom: 0.15rem;
+        }
+        
+        .examples-subtitle {
+            color: #94a3b8;
+            font-size: 0.92rem;
+            margin-bottom: 0.8rem;
+        }
+        
+        div[data-testid="column"] .stButton > button {
+            border-radius: 999px;
+            background: rgba(59, 130, 246, 0.10);
+            border: 1px solid rgba(59, 130, 246, 0.28);
+            color: #dbeafe;
+            font-weight: 500;
+            padding: 0.55rem 0.9rem;
+        }
+        
+        div[data-testid="column"] .stButton > button:hover {
+            background: rgba(59, 130, 246, 0.18);
+            border-color: rgba(96, 165, 250, 0.55);
+            color: #ffffff;
+        }
     </style>
     """,
     unsafe_allow_html=True,
@@ -156,33 +189,60 @@ with tab1:
             st.success("Rozmowa została wyczyszczona.")
 
 with tab2:
-    st.subheader("Czat")
+    st.subheader("Czat z asystentem")
 
-    chat_container = st.container()
+    example_questions = EXAMPLE_QUESTIONS
 
-    with chat_container:
-        for message in st.session_state.messages:
-            with st.chat_message(message["role"]):
-                st.markdown(message["content"])
+    if "show_examples" not in st.session_state:
+        st.session_state.show_examples = True
+
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+
+    selected_question = None
+
+    if st.session_state.show_examples and not st.session_state.messages:
+        st.markdown(
+            """
+            <div class="examples-wrapper">
+                <div class="examples-title">Nie wiesz od czego zacząć?</div>
+                <div class="examples-subtitle">Wybierz jedno z przykładowych pytań:</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        cols = st.columns(2)
+
+        for index, question in enumerate(example_questions):
+            with cols[index % 2]:
+                if st.button(question, key=f"example_question_{index}"):
+                    selected_question = question
+                    st.session_state.show_examples = False
 
     user_question = st.chat_input("Zadaj pytanie dotyczące dokumentów...")
 
-    if user_question:
+    final_question = selected_question or user_question
+
+    if final_question:
+        st.session_state.show_examples = False
+
         st.session_state.messages.append(
             {
                 "role": "user",
-                "content": user_question,
+                "content": final_question,
             }
         )
 
         with st.spinner("Szukam odpowiedzi w dokumentach..."):
             result = ask_rag(
-                question=user_question,
-                chat_history=st.session_state.messages[-6:]
+                question=final_question,
+                chat_history=st.session_state.messages[-6:],
             )
 
-
         assistant_answer = result["answer"]
+
         st.session_state.messages.append(
             {
                 "role": "assistant",
@@ -191,22 +251,21 @@ with tab2:
         )
 
         st.session_state.last_sources = result["sources"]
+
         st.rerun()
 
-
     if st.session_state.last_sources:
-        st.markdown("### Źródła ostatniej odpowiedzi")
+        with st.expander("Źródła ostatniej odpowiedzi"):
+            for i, doc in enumerate(st.session_state.last_sources, start=1):
+                source_name = html.escape(doc.metadata.get("source", "unknown"))
+                source_text = html.escape(doc.page_content[:1000])
 
-        for i, doc in enumerate(st.session_state.last_sources, start=1):
-            source_name = html.escape(doc.metadata.get("source", "unknown"))
-            source_text = html.escape(doc.page_content[:1000])
-
-            st.markdown(
-                f"""
-                <div class="source-box">
-                    <div class="source-title">Źródło {i}: {source_name}</div>
-                    <div class="source-text">{source_text}</div>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
+                st.markdown(
+                    f"""
+                    <div class="source-box">
+                        <div class="source-title">Źródło {i}: {source_name}</div>
+                        <div class="source-text">{source_text}</div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
