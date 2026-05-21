@@ -1,6 +1,7 @@
 from langchain_openai import ChatOpenAI
+
 from src.vector_store import load_vector_store
-from src.prompts import RAG_PROMPT_TEMPLATE
+from src.prompts import RAG_PROMPT_TEMPLATE, QUERY_REWRITE_PROMPT
 
 
 def format_docs(docs):
@@ -12,7 +13,7 @@ def format_docs(docs):
 
 def format_chat_history(chat_history):
     if not chat_history:
-        return "Brak wcześniejszej historii rozmowy."
+        return "Brak historii rozmowy."
 
     formatted = []
 
@@ -23,26 +24,51 @@ def format_chat_history(chat_history):
     return "\n".join(formatted)
 
 
-def ask_rag(question: str, chat_history=None):
-    vector_store = load_vector_store()
-    retriever = vector_store.as_retriever(search_kwargs={"k": 4})
+def rewrite_query(question: str, chat_history=None) -> str:
+    llm = ChatOpenAI(
+        model="gpt-4o-mini",
+        temperature=0
+    )
 
-    docs = retriever.invoke(question)
+    prompt = QUERY_REWRITE_PROMPT.format(
+        question=question,
+        chat_history=format_chat_history(chat_history)
+    )
+
+    response = llm.invoke(prompt)
+
+    return response.content.strip()
+
+
+def ask_rag(question: str, chat_history=None):
+    rewritten_query = rewrite_query(
+        question=question,
+        chat_history=chat_history
+    )
+
+    vector_store = load_vector_store()
+    retriever = vector_store.as_retriever(
+        search_kwargs={"k": 4}
+    )
+
+    docs = retriever.invoke(rewritten_query)
 
     context = format_docs(docs)
-    history_text = format_chat_history(chat_history)
 
     prompt = RAG_PROMPT_TEMPLATE.format(
-        history_text=history_text,
         context=context,
         question=question
     )
 
-    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
+    llm = ChatOpenAI(
+        model="gpt-4o-mini",
+        temperature=0
+    )
 
     response = llm.invoke(prompt)
-
+    print(rewritten_query)
     return {
         "answer": response.content,
         "sources": docs,
+        "rewritten_query": rewritten_query
     }

@@ -2,17 +2,37 @@ RAG_PROMPT_TEMPLATE = """
 Jesteś firmowym asystentem AI.
 
 Odpowiadaj wyłącznie na podstawie dostarczonego kontekstu.
-Jeśli w kontekście nie ma wystarczających informacji, napisz wyraźnie:
+Jeśli w kontekście nie ma wystarczających informacji, napisz:
 "Brak wystarczających informacji w dostępnych dokumentach."
-
-Historia rozmowy:
-{history_text}
 
 Kontekst:
 {context}
 
-Pytanie:
+Pytanie użytkownika:
 {question}
 
 Odpowiedź:
+"""
+
+
+QUERY_REWRITE_PROMPT = """
+Jesteś agentem przepisującym zapytania do systemu RAG.
+
+Twoim zadaniem jest przekształcić pytanie użytkownika w precyzyjne zapytanie
+do wyszukiwarki semantycznej.
+
+Zasady:
+- nie odpowiadaj na pytanie
+- nie dodawaj nowych faktów
+- zachowaj sens pytania
+- jeśli pytanie odnosi się do wcześniejszej rozmowy, użyj historii rozmowy
+- wynik ma być jednym, konkretnym zapytaniem
+
+Historia rozmowy:
+{chat_history}
+
+Aktualne pytanie użytkownika:
+{question}
+
+Przepisane zapytanie:
 """

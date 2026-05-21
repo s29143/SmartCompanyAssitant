@@ -181,8 +181,8 @@ with tab2:
                 chat_history=st.session_state.messages[-6:]
             )
 
-        assistant_answer = result["answer"]
 
+        assistant_answer = result["answer"]
         st.session_state.messages.append(
             {
                 "role": "assistant",
@@ -192,6 +192,7 @@ with tab2:
 
         st.session_state.last_sources = result["sources"]
         st.rerun()
+
 
     if st.session_state.last_sources:
         st.markdown("### Źródła ostatniej odpowiedzi")
