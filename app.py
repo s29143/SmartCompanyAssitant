@@ -43,7 +43,7 @@ def ingest_documents():
 
 
 st.set_page_config(
-    page_title="Asystent firmowy RAG",
+    page_title="Smart Chat Assistant",
     page_icon="📘",
     layout="wide",
 )
@@ -143,12 +143,12 @@ if "last_sources" not in st.session_state:
     st.session_state.last_sources = []
 
 st.markdown(
-    '<div class="main-title">📘 Asystent firmowy RAG</div>',
+    '<div class="main-title">📘 Smart Chat Assistant</div>',
     unsafe_allow_html=True,
 )
 
 st.markdown(
-    '<div class="subtitle">Wgraj dokumenty, zbuduj indeks i rozmawiaj z asystentem na podstawie firmowej wiedzy.</div>',
+    '<div class="subtitle">Zadaj pytanie wirtualnemu asystentowi RAG.</div>',
     unsafe_allow_html=True,
 )
 
@@ -221,7 +221,7 @@ with tab2:
                     selected_question = question
                     st.session_state.show_examples = False
 
-    user_question = st.chat_input("Zadaj pytanie dotyczące dokumentów...")
+    user_question = st.chat_input("Zadaj pytanie...")
 
     final_question = selected_question or user_question
 
@@ -235,7 +235,7 @@ with tab2:
             }
         )
 
-        with st.spinner("Szukam odpowiedzi w dokumentach..."):
+        with st.spinner("Myślę..."):
             result = ask_rag(
                 question=final_question,
                 chat_history=st.session_state.messages[-6:],
