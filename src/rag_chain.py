@@ -40,9 +40,46 @@ def format_chat_history(chat_history):
     return "\n".join(formatted)
 
 
-def build_source_recommendations(docs, max_recommendations: int | None = None):
+def build_source_recommendations(docs, question: str | None = None, max_recommendations: int | None = None):
     recommendations = []
     seen_sources = set()
+    question_text = (question or "").lower()
+    keywords = set(re.findall(r"[a-ząćęłńóśźż0-9]+", question_text))
+
+    def is_relevant(doc, source_name: str) -> bool:
+        if not question_text:
+            return True
+
+        content = " ".join(
+            [
+                str(doc.page_content or ""),
+                str(doc.metadata.get("source", "") or ""),
+                str(doc.metadata.get("title", "") or ""),
+            ]
+        ).lower()
+
+        if not content:
+            return True
+
+        content_tokens = set(re.findall(r"[a-ząćęłńóśźż0-9]+", content))
+        overlap = keywords & content_tokens
+        if overlap:
+            return True
+
+        strong_topic_terms = {
+            "cena": {"cena", "ceny", "cenę", "koszt", "koszty"},
+            "usługa": {"usługa", "usługi", "usługę", "oferta", "ofertę"},
+            "kontakt": {"kontakt", "skontakt", "formularz"},
+            "o": {"o", "nas"},
+            "proces": {"proces", "wdrożenie", "współpraca", "etap"},
+        }
+
+        for topic, terms in strong_topic_terms.items():
+            if topic in question_text:
+                if any(term in content for term in terms):
+                    return True
+
+        return source_name in question_text or any(term in source_name for term in keywords if len(term) > 2)
 
     for doc in docs:
         source = str(doc.metadata.get("source", "unknown") or "unknown").strip()
@@ -50,6 +87,12 @@ def build_source_recommendations(docs, max_recommendations: int | None = None):
             continue
 
         seen_sources.add(source)
+
+        source_name = source.split("/")[-1].split("\\")[-1].rsplit(".", 1)[0]
+        source_name = re.sub(r"[^a-z0-9]+", "-", source_name.lower()).strip("-")
+
+        if not is_relevant(doc, source_name):
+            continue
 
         for key in ("url", "link", "slug", "path"):
             raw_value = doc.metadata.get(key, "")
@@ -61,8 +104,6 @@ def build_source_recommendations(docs, max_recommendations: int | None = None):
                 url = candidate if candidate.startswith("/") else f"/{candidate.strip('/')}/"
                 break
         else:
-            source_name = source.split("/")[-1].split("\\")[-1].rsplit(".", 1)[0]
-            source_name = re.sub(r"[^a-z0-9]+", "-", source_name.lower()).strip("-")
             url = f"/{source_name}/" if source_name else "/"
 
         recommendations.append(

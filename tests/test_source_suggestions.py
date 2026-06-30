@@ -23,6 +23,19 @@ class BuildSourceRecommendationsTests(unittest.TestCase):
         )
         self.assertEqual(recommendations[0]["url"], "/about-us/")
 
+    def test_build_source_recommendations_filters_irrelevant_sources(self):
+        docs = [
+            Document(page_content="O nas i historii firmy", metadata={"source": "about-us", "type": "wordpress"}),
+            Document(page_content="Cennik i ceny usług", metadata={"source": "pricing", "type": "wordpress"}),
+            Document(page_content="Kontakt z nami", metadata={"source": "contact", "type": "wordpress"}),
+        ]
+
+        recommendations = build_source_recommendations(docs, question="Jakie są ceny usług?")
+
+        self.assertEqual(len(recommendations), 1)
+        self.assertEqual(recommendations[0]["source"], "pricing")
+        self.assertEqual(recommendations[0]["url"], "/pricing/")
+
 
 if __name__ == "__main__":
     unittest.main()
