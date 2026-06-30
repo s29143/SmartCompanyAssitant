@@ -17,6 +17,10 @@ def main():
         for doc in result["sources"]:
             print(f"- {doc.metadata.get('source', 'unknown')}")
 
+        print("\nProponowane podstrony:")
+        for recommendation in result.get("source_recommendations", []):
+            print(f"- {recommendation['source']} -> {recommendation['url']}")
+
 
 if __name__ == "__main__":
     load_dotenv()

@@ -1,3 +1,5 @@
+import re
+
 from langchain_openai import ChatOpenAI
 
 from src.vector_store import load_vector_store
@@ -36,6 +38,52 @@ def format_chat_history(chat_history):
         formatted.append(f"{role}: {message['content']}")
 
     return "\n".join(formatted)
+
+
+def build_source_recommendations(docs, max_recommendations: int | None = None):
+    recommendations = []
+    seen_sources = set()
+
+    for doc in docs:
+        source = str(doc.metadata.get("source", "unknown") or "unknown").strip()
+        if not source or source in seen_sources:
+            continue
+
+        seen_sources.add(source)
+
+        for key in ("url", "link", "slug", "path"):
+            raw_value = doc.metadata.get(key, "")
+            if isinstance(raw_value, str) and raw_value.strip():
+                candidate = raw_value.strip()
+                if candidate.startswith("http://") or candidate.startswith("https://"):
+                    url = candidate
+                    break
+                url = candidate if candidate.startswith("/") else f"/{candidate.strip('/')}/"
+                break
+        else:
+            source_name = source.split("/")[-1].split("\\")[-1].rsplit(".", 1)[0]
+            source_name = re.sub(r"[^a-z0-9]+", "-", source_name.lower()).strip("-")
+            url = f"/{source_name}/" if source_name else "/"
+
+        recommendations.append(
+            {
+                "source": source,
+                "url": url,
+                "type": str(doc.metadata.get("type", "unknown")),
+            }
+        )
+
+        if max_recommendations is not None and len(recommendations) >= max_recommendations:
+            break
+
+    if max_recommendations is None:
+        if len(recommendations) <= 2:
+            return recommendations[:1]
+        if len(recommendations) <= 5:
+            return recommendations[:3]
+        return recommendations[:4]
+
+    return recommendations
 
 
 def rewrite_query(question: str, chat_history=None) -> str:
@@ -116,9 +164,12 @@ def ask_rag(question: str, chat_history=None):
     print(f"\n[SOURCE VERIFIER AGENT]")
     print("Answer verified.")
 
+    source_recommendations = build_source_recommendations(docs)
+
     return {
         "answer": verified_answer,
         "raw_answer": raw_answer,
         "sources": docs,
         "rewritten_query": rewritten_query,
+        "source_recommendations": source_recommendations,
     }

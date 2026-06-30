@@ -6,9 +6,10 @@ from pydantic import BaseModel, Field, field_validator
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
-
+from dotenv import load_dotenv
 from src.rag_chain import ask_rag
 
+load_dotenv()
 ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000").split(",")
 
 limiter = Limiter(key_func=get_remote_address)
@@ -46,6 +47,7 @@ class QueryResponse(BaseModel):
     raw_answer: str
     sources: list[str]
     rewritten_query: str
+    source_recommendations: list[dict[str, str]]
 
 
 @app.post("/ask", response_model=QueryResponse)
@@ -68,6 +70,7 @@ def ask(request: Request, body: QueryRequest):
                 for doc in result["sources"]
             ],
             rewritten_query=result["rewritten_query"],
+            source_recommendations=result.get("source_recommendations", []),
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
